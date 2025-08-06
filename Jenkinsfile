@@ -30,13 +30,13 @@ pipeline {
                 sshagent (credentials: ["${EC2_KEY}"]) {
                     sh '''
                         ssh -o StrictHostKeyChecking=no ${EC2_HOST} "
-                            if [ ! -d /var/www/nodeapp ]; then
-                                mkdir -p /var/www/nodeapp && cd /var/www/nodeapp
+                            if [ ! -d /home/ubuntu/testrepo1 ]; then
+                                mkdir -p /home/ubuntu/testrepo1p && cd /home/ubuntu/testrepo1
                                 git clone git@github.com:hitesh1811/testrepo1.git
                             else
-                                cd /var/www/nodeapp && git pull origin main
+                                cd /home/ubuntu/testrepo1 && git pull origin main
                             fi
-                            cd /var/www/nodeapp &&
+                            cd /home/ubuntu/testrepo1 &&
                             npm install &&
                             pm2 restart app || pm2 start app.js --name app
                         "
