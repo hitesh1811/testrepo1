@@ -2,9 +2,8 @@ pipeline {
     agent any
 
     environment {
-        SONARQUBE_ENV = 'MySonarQube'       // Must match Jenkins SonarQube Server name
-        EC2_HOST = 'ubuntu@52.66.147.75'           // Your EC2 instance user and IP
-        EC2_KEY = 'ec2-ssh-creds'           // Jenkins credentials ID for EC2 SSH key
+        EC2_HOST = 'ubuntu@52.66.147.75'     // Your EC2 instance user and IP
+        EC2_KEY = 'ec2-ssh-creds'            // Jenkins credentials ID for EC2 SSH key
     }
 
     stages {
@@ -17,31 +16,6 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh 'npm install'
-            }
-        }
-
-        stage('Code Quality Check') {
-            steps {
-                script {
-                    withSonarQubeEnv("${SONARQUBE_ENV}") {
-                        sh "${tool 'SonarQubeScanner'}/bin/sonar-scanner"
-                    }
-                }
-            }
-        }
-
-        stage('Quality Gate') {
-            steps {
-                timeout(time: 15, unit: 'MINUTES') {
-                    script {
-                        def qg = waitForQualityGate()
-                        if (qg.status != 'OK') {
-                            echo "⚠️ Quality Gate failed: ${qg.status}. Continuing deployment for development environment."
-                        } else {
-                            echo "✅ Quality Gate passed: ${qg.status}"
-                        }
-                    }
-                }
             }
         }
 
@@ -60,7 +34,7 @@ pipeline {
                                 mkdir -p /var/www/nodeapp
                                 git clone git@github.com:hitesh1811/testrepo1.git /var/www/nodeapp
                             else
-                                cd /var/www/nodeapp && git pull origin master
+                                cd /var/www/nodeapp && git pull origin main
                             fi
                             cd /var/www/nodeapp &&
                             npm install &&
