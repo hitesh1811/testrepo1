@@ -4,7 +4,8 @@
   "description": "Sample Node.js Project",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "node app.js",
+    "test": "echo \"No tests defined\" && exit 0"
   },
   "author": "Adem Cemil YALCIN",
   "license": "ISC",
