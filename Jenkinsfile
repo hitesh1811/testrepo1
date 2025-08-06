@@ -36,7 +36,7 @@ pipeline {
             steps {
                 sshagent(['ec2-ssh-creds']) {
                     sh """
-                    ssh -o StrictHostKeyChecking=no ec2-user@YOUR_EC2_PUBLIC_IP '
+                    ssh -o StrictHostKeyChecking=no ec2-user@52.66.147.75'
                         cd testrepo1 || git clone git@github.com:hitesh1811/testrepo1.git &&
                         cd testrepo1 &&
                         git pull origin main &&
