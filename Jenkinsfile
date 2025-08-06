@@ -31,8 +31,8 @@ pipeline {
                     sh '''
                         ssh -o StrictHostKeyChecking=no ${EC2_HOST} "
                             if [ ! -d /var/www/nodeapp ]; then
-                                mkdir -p /var/www/nodeapp
-                                git clone git@github.com:hitesh1811/testrepo1.git /var/www/nodeapp
+                                mkdir -p /var/www/nodeapp && cd /var/www/nodeapp
+                                git clone git@github.com:hitesh1811/testrepo1.git
                             else
                                 cd /var/www/nodeapp && git pull origin main
                             fi
