@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        SONARQUBE_ENV = 'SonarQubeServer'   // Must match Jenkins SonarQube Server name
+        SONARQUBE_ENV = 'MySonarQube'   // Must match Jenkins SonarQube Server name
         EC2_HOST = '52.66.147.75'   // Your EC2 instance user and IP
         EC2_KEY = 'ec2-ssh-creds'             // Jenkins credentials ID for EC2 SSH key
     }
