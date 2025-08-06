@@ -38,7 +38,7 @@ pipeline {
                             fi
                             cd /home/ubuntu/testrepo1 &&
                             npm install &&
-                            pm2 restart app || pm2 start app.js --name app
+                            pm2 restart testrepo || pm2 start app.js --name testrepo
                         "
                     '''
                 }
