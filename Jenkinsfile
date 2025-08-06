@@ -1,10 +1,6 @@
 pipeline {
     agent any
 
-    tools {
-        SonarQubeScanner 'SonarQubeScanner' // Must match Jenkins Tools configuration
-    }
-
     environment {
         SONARQUBE_ENV = 'SonarQubeServer'   // Must match Jenkins SonarQube Server name
         EC2_HOST = '52.66.147.75'   // Your EC2 instance user and IP
@@ -43,8 +39,12 @@ pipeline {
                 sshagent (credentials: ["${EC2_KEY}"]) {
                     sh '''
                         ssh -o StrictHostKeyChecking=no ${EC2_HOST} "
-                            cd /var/www/nodeapp || mkdir -p /var/www/nodeapp &&
-                            git pull origin master || git clone git@github.com:hitesh1811/testrepo1.git /var/www/nodeapp &&
+                            if [ ! -d /var/www/nodeapp ]; then
+                                mkdir -p /var/www/nodeapp
+                                git clone git@github.com:hitesh1811/testrepo1.git /var/www/nodeapp
+                            else
+                                cd /var/www/nodeapp && git pull origin master
+                            fi
                             cd /var/www/nodeapp &&
                             npm install &&
                             pm2 restart app || pm2 start app.js --name app
