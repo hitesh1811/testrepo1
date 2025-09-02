@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         EC2_HOST = 'ubuntu@3.110.32.201'     // Your EC2 instance user and IP
-        EC2_KEY = 'ec2-ssh-creds'            // Jenkins credentials ID for EC2 SSH key
+        EC2_KEY  = 'ec2-ssh-creds'           // Jenkins credentials ID for EC2 SSH key
     }
 
     stages {
@@ -22,8 +22,8 @@ pipeline {
         stage('Push to DockerHub') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials',
-                                                  usernameVariable: 'hitesh1811',
-                                                  passwordVariable: 'Solution@2025')]) {
+                                                  usernameVariable: 'DOCKER_USER',
+                                                  passwordVariable: 'DOCKER_PASS')]) {
                     sh '''
                       echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
                       docker push hitesh1811/testrepo1:latest
