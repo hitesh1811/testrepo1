@@ -2,9 +2,8 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_HUB_REPO = 'hitesh1811/testrepo1'
-        EC2_HOST = 'ubuntu@3.110.32.201'
-        EC2_CRED = 'docker-hub-credentials'   // Jenkins credentials ID for EC2 SSH key
+        EC2_HOST = 'ubuntu@3.110.32.201'     // Your EC2 instance user and IP
+        EC2_KEY = 'ec2-ssh-creds'            // Jenkins credentials ID for EC2 SSH key
     }
 
     stages {
@@ -14,61 +13,45 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Install Dependencies') {
             steps {
-                script {
-                    sh "docker build -t ${DOCKER_HUB_REPO}:latest ."
-                }
+                sh 'npm install'
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Unit Tests') {
             steps {
-                withDockerRegistry([ credentialsId: 'docker-hub-creds', url: '' ]) {
-                    sh "docker push ${DOCKER_HUB_REPO}:latest"
-                }
+                sh 'npm test'
             }
         }
 
         stage('Deploy to EC2') {
             steps {
-                sshagent (credentials: [env.EC2_CRED]) {
+                sshagent (credentials: ["${EC2_KEY}"]) {
                     sh '''
-                        ssh -o StrictHostKeyChecking=no ${EC2_HOST} << 'EOF'
-
-                        # Stop and remove old container if exists
-                        docker stop testrepo1 || true
-                        docker rm testrepo1 || true
-
-                        # Pull latest image
-                        docker pull ${DOCKER_HUB_REPO}:latest
-
-                        # Function to check if port is free
-                        is_port_free() {
-                            ! sudo lsof -i :$1 >/dev/null 2>&1
-                        }
-
-                        # Default port
-                        PORT=3000
-
-                        # Try alternative ports if 3000 is busy
-                        if ! is_port_free 3000; then
-                            echo "Port 3000 busy, trying 8080..."
-                            if is_port_free 8080; then
-                                PORT=8080
+                        ssh -o StrictHostKeyChecking=no ${EC2_HOST} "
+                            if [ ! -d /home/ubuntu/testrepo1 ]; then
+                                mkdir -p /home/ubuntu/testrepo1p && cd /home/ubuntu/testrepo1
+                                git clone git@github.com:hitesh1811/testrepo1.git
                             else
-                                echo "Port 8080 busy, falling back to 5000..."
-                                PORT=5000
+                                cd /home/ubuntu/testrepo1 && git pull origin main
                             fi
-                        fi
-
-                        echo "Running container on port $PORT"
-                        docker run -d --name testrepo1 -p $PORT:3000 ${DOCKER_HUB_REPO}:latest
-
-                        EOF
+                            cd /home/ubuntu/testrepo1 &&
+                            npm install &&
+                            pm2 restart testrepo1 || pm2 start app.js --name testrepo1
+                        "
                     '''
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Pipeline completed successfully!"
+        }
+        failure {
+            echo "❌ Pipeline failed. Check logs for details."
         }
     }
 }
