@@ -15,45 +15,43 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t hitesh1811/testrepo1:latest .'
-            }
-        }
-
-        stage('Push to DockerHub') {
-            steps {
-                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials',
-                                                  usernameVariable: 'DOCKER_USER',
-                                                  passwordVariable: 'DOCKER_PASS')]) {
-                    sh '''
-                      echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                      docker push hitesh1811/testrepo1:latest
-                    '''
+                script {
+                    dockerImage = docker.build("hitesh1811/testrepo1:latest")
                 }
             }
         }
 
-        stage('Deploy on EC2 with Docker') {
+        stage('Push Docker Image') {
             steps {
-                sshagent([env.EC2_KEY]) {
-                    sh '''
-                      ssh -o StrictHostKeyChecking=no $EC2_HOST "
-                        docker pull hitesh1811/testrepo1:latest &&
-                        docker stop testrepo1 || true &&
-                        docker rm testrepo1 || true &&
-                        docker run -d --name testrepo1 -p 3000:3000 hitesh1811/testrepo1:latest
-                      "
-                    '''
+                script {
+                    docker.withRegistry('', 'docker-hub-credentials') {
+                        dockerImage.push("latest")
+                    }
                 }
             }
         }
-    }
 
-    post {
-        success {
-            echo "✅ Pipeline executed successfully!"
-        }
-        failure {
-            echo "❌ Pipeline failed. Check logs for details."
+        stage('Deploy to EC2') {
+            steps {
+                sshagent (credentials: [env.EC2_KEY]) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no $EC2_HOST '
+                            # Kill any running Node.js process (non-Docker)
+                            pkill -f "node" || true
+
+                            # Pull latest image
+                            docker pull hitesh1811/testrepo1:latest &&
+
+                            # Stop and remove old container if exists
+                            docker stop testrepo1 || true &&
+                            docker rm testrepo1 || true &&
+
+                            # Run new container on port 3000
+                            docker run -d --name testrepo1 -p 3000:3000 hitesh1811/testrepo1:latest
+                        '
+                    '''
+                }
+            }
         }
     }
 }
