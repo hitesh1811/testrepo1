@@ -1,19 +1,20 @@
-FROM node:24-alpine
+# Use official Node.js runtime as base image
+FROM node:18-alpine
 
-# Create app user and group
-RUN addgroup app && adduser -S -G app app
-
+# Set working directory inside container
 WORKDIR /usr/src/app
 
-# Copy package files and install dependencies as root
+# Copy package.json and package-lock.json first (for better caching)
 COPY package*.json ./
-RUN npm ci --omit=dev
 
-# Copy rest of the app
+# Install dependencies
+RUN npm install --production
+
+# Copy the rest of the application code
 COPY . .
 
-# Switch to non-root user for runtime
-USER app
-
+# Expose the app port (update if your app uses a different port)
 EXPOSE 3000
+
+# Start the application
 CMD ["node", "app.js"]
