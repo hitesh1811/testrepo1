@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         EC2_HOST = 'ubuntu@3.110.32.201'     // Your EC2 instance user and IP
-        EC2_KEY = 'ec2-ssh-creds'            // Jenkins credentials ID for EC2 SSH key
+        EC2_KEY  = 'ec2-ssh-creds'           // Jenkins credentials ID for EC2 SSH key
     }
 
     stages {
@@ -13,33 +13,35 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Build Docker Image') {
             steps {
-                sh 'npm install'
+                sh 'docker build -t hitesh1811/testrepo1:latest .'
             }
         }
 
-        stage('Unit Tests') {
+        stage('Push to DockerHub') {
             steps {
-                sh 'npm test'
-            }
-        }
-
-        stage('Deploy to EC2') {
-            steps {
-                sshagent (credentials: ["${EC2_KEY}"]) {
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials',
+                                                  usernameVariable: 'DOCKER_USER',
+                                                  passwordVariable: 'DOCKER_PASS')]) {
                     sh '''
-                        ssh -o StrictHostKeyChecking=no ${EC2_HOST} "
-                            if [ ! -d /home/ubuntu/testrepo1 ]; then
-                                mkdir -p /home/ubuntu/testrepo1p && cd /home/ubuntu/testrepo1
-                                git clone git@github.com:hitesh1811/testrepo1.git
-                            else
-                                cd /home/ubuntu/testrepo1 && git pull origin main
-                            fi
-                            cd /home/ubuntu/testrepo1 &&
-                            npm install &&
-                            pm2 restart testrepo1 || pm2 start app.js --name testrepo1
-                        "
+                      echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                      docker push hitesh1811/testrepo1:latest
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy on EC2 with Docker') {
+            steps {
+                sshagent([env.EC2_KEY]) {
+                    sh '''
+                      ssh -o StrictHostKeyChecking=no $EC2_HOST "
+                        docker pull hitesh1811/testrepo1:latest &&
+                        docker stop testrepo1 || true &&
+                        docker rm testrepo1 || true &&
+                        docker run -d --name testrepo1 -p 3000:3000 hitesh1811/testrepo1:latest
+                      "
                     '''
                 }
             }
@@ -48,7 +50,7 @@ pipeline {
 
     post {
         success {
-            echo "✅ Pipeline completed successfully!"
+            echo "✅ Pipeline executed successfully!"
         }
         failure {
             echo "❌ Pipeline failed. Check logs for details."
