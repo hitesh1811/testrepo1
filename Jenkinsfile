@@ -44,12 +44,12 @@ pipeline {
 
                         PORT=3000
                         if sudo lsof -i :3000; then
-                            echo "Port 3000 busy, switching to 8080..."
-                            PORT=8080
+                            echo "Port 3000 busy, switching to 4000..."
+                            PORT=4000
                         fi
 
                         echo "Running container on port $PORT"
-                        docker run -d --name testrepo1 -p $PORT:3000 ${DOCKER_HUB_REPO}:latest
+                        docker run -d --name testrepo1 -p $PORT:4000 ${DOCKER_HUB_REPO}:latest
 
                         echo "Deployed at: http://$(curl -s ifconfig.me):$PORT"
 
