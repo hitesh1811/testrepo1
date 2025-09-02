@@ -2,8 +2,13 @@ pipeline {
     agent any
 
     environment {
-        EC2_HOST = 'ubuntu@3.110.32.201'     // Your EC2 instance user and IP
-        EC2_KEY  = 'ec2-ssh-creds'           // Jenkins credentials ID for EC2 SSH key
+        DOCKER_HUB_REPO = 'hitesh1811/testrepo1'
+        EC2_HOST = 'ubuntu@3.110.32.201'
+        EC2_CRED = 'ec2-ssh-creds'
+    }
+
+    triggers {
+        githubPush()   // Auto trigger on GitHub push
     }
 
     stages {
@@ -15,45 +20,43 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t hitesh1811/testrepo1:latest .'
+                sh "docker build -t ${DOCKER_HUB_REPO}:latest ."
             }
         }
 
-        stage('Push to DockerHub') {
+        stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials',
-                                                  usernameVariable: 'DOCKER_USER',
-                                                  passwordVariable: 'DOCKER_PASS')]) {
-                    sh '''
-                      echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                      docker push hitesh1811/testrepo1:latest
-                    '''
+                withDockerRegistry([ credentialsId: 'docker-hub-credentials', url: '' ]) {
+                    sh "docker push ${DOCKER_HUB_REPO}:latest"
                 }
             }
         }
 
-        stage('Deploy on EC2 with Docker') {
+        stage('Deploy to EC2') {
             steps {
-                sshagent([env.EC2_KEY]) {
+                sshagent (credentials: [env.EC2_CRED]) {
                     sh '''
-                      ssh -o StrictHostKeyChecking=no $EC2_HOST "
-                        docker pull hitesh1811/testrepo1:latest &&
-                        docker stop testrepo1 || true &&
-                        docker rm testrepo1 || true &&
-                        docker run -d --name testrepo1 -p 4000:3000 hitesh1811/testrepo1:latest
-                      "
+                        ssh -o StrictHostKeyChecking=no ${EC2_HOST} << 'EOF'
+
+                        docker stop testrepo1 || true
+                        docker rm testrepo1 || true
+                        docker pull ${DOCKER_HUB_REPO}:latest
+
+                        PORT=3000
+                        if sudo lsof -i :3000; then
+                            echo "Port 3000 busy, switching to 8080..."
+                            PORT=8080
+                        fi
+
+                        echo "Running container on port $PORT"
+                        docker run -d --name testrepo1 -p $PORT:3000 ${DOCKER_HUB_REPO}:latest
+
+                        echo "Deployed at: http://$(curl -s ifconfig.me):$PORT"
+
+                        EOF
                     '''
                 }
             }
-        }
-    }
-
-    post {
-        success {
-            echo "✅ Pipeline executed successfully!"
-        }
-        failure {
-            echo "❌ Pipeline failed. Check logs for details."
         }
     }
 }
