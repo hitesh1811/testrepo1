@@ -40,7 +40,7 @@ pipeline {
                         docker pull hitesh1811/testrepo1:latest &&
                         docker stop testrepo1 || true &&
                         docker rm testrepo1 || true &&
-                        docker run -d --name testrepo1 -p 3000:3000 hitesh1811/testrepo1:latest
+                        docker run -d --name testrepo1 -p 4000:3000 hitesh1811/testrepo1:latest
                       "
                     '''
                 }
