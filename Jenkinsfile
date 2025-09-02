@@ -2,10 +2,9 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('docker-hub-credentials') // Jenkins credentials ID
-        EC2_HOST = 'ubuntu@3.110.32.201'                       // EC2 user@IP
-        EC2_KEY = 'ec2-ssh-creds'                              // Jenkins SSH private key ID
-        IMAGE_NAME = 'hitesh1811/testrepo1'
+        DOCKER_HUB_REPO = 'hitesh1811/testrepo1'
+        EC2_HOST = 'ubuntu@3.110.32.201'
+        EC2_CRED = 'docker-hub-credentials'   // Jenkins credentials ID for EC2 SSH key
     }
 
     stages {
@@ -18,49 +17,58 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    sh """
-                        echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login -u "${DOCKERHUB_CREDENTIALS_USR}" --password-stdin
-                        docker build -t ${IMAGE_NAME}:latest .
-                    """
+                    sh "docker build -t ${DOCKER_HUB_REPO}:latest ."
                 }
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                script {
-                    sh "docker push ${IMAGE_NAME}:latest"
+                withDockerRegistry([ credentialsId: 'docker-hub-creds', url: '' ]) {
+                    sh "docker push ${DOCKER_HUB_REPO}:latest"
                 }
             }
         }
 
         stage('Deploy to EC2') {
             steps {
-                sshagent (credentials: [EC2_KEY]) {
-                    sh """
-                        ssh -o StrictHostKeyChecking=no ${EC2_HOST} '
-                            # Kill any process using port 3000 (Node.js or Docker leftovers)
-                            sudo fuser -k 3000/tcp || true
+                sshagent (credentials: [env.EC2_CRED]) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no ${EC2_HOST} << 'EOF'
 
-                            # Pull latest image
-                            docker pull ${IMAGE_NAME}:latest &&
+                        # Stop and remove old container if exists
+                        docker stop testrepo1 || true
+                        docker rm testrepo1 || true
 
-                            # Stop and remove old container if exists
-                            docker stop testrepo1 || true &&
-                            docker rm testrepo1 || true &&
+                        # Pull latest image
+                        docker pull ${DOCKER_HUB_REPO}:latest
 
-                            # Run new container on port 3000
-                            docker run -d --name testrepo1 -p 3000:3000 ${IMAGE_NAME}:latest
-                        '
-                    """
+                        # Function to check if port is free
+                        is_port_free() {
+                            ! sudo lsof -i :$1 >/dev/null 2>&1
+                        }
+
+                        # Default port
+                        PORT=3000
+
+                        # Try alternative ports if 3000 is busy
+                        if ! is_port_free 3000; then
+                            echo "Port 3000 busy, trying 8080..."
+                            if is_port_free 8080; then
+                                PORT=8080
+                            else
+                                echo "Port 8080 busy, falling back to 5000..."
+                                PORT=5000
+                            fi
+                        fi
+
+                        echo "Running container on port $PORT"
+                        docker run -d --name testrepo1 -p $PORT:3000 ${DOCKER_HUB_REPO}:latest
+
+                        EOF
+                    '''
                 }
             }
-        }
-    }
-
-    post {
-        always {
-            cleanWs()
         }
     }
 }
