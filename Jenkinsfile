@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        EC2_HOST = 'ubuntu@3.110.32.201'   // Your EC2 instance
-        EC2_KEY  = 'ec2-ssh-creds'         // Jenkins SSH key credential ID
+        EC2_HOST = 'ubuntu@3.110.32.201'     // Your EC2 instance user and IP
+        EC2_KEY  = 'ec2-ssh-creds'           // Jenkins credentials ID for EC2 SSH key
     }
 
     stages {
@@ -19,38 +19,41 @@ pipeline {
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Push to DockerHub') {
             steps {
-                withDockerRegistry([credentialsId: 'dockerhub-creds', url: '']) {
-                    sh 'docker push hitesh1811/testrepo1:latest'
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials',
+                                                  usernameVariable: 'DOCKER_USER',
+                                                  passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                      echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                      docker push hitesh1811/testrepo1:latest
+                    '''
                 }
             }
         }
 
-        stage('Deploy to EC2') {
+        stage('Deploy on EC2 with Docker') {
             steps {
                 sshagent([env.EC2_KEY]) {
-                    sh """
-                        ssh -o StrictHostKeyChecking=no $EC2_HOST '
-                            # Kill Node.js process if running
-                            pkill -f "node" || true
-
-                            # Free port 3000 if in use
-                            sudo fuser -k 3000/tcp || true
-
-                            # Pull latest image
-                            docker pull hitesh1811/testrepo1:latest
-
-                            # Stop and remove old container
-                            docker stop testrepo1 || true
-                            docker rm testrepo1 || true
-
-                            # Run new container
-                            docker run -d --name testrepo1 -p 3000:3000 hitesh1811/testrepo1:latest
-                        '
-                    """
+                    sh '''
+                      ssh -o StrictHostKeyChecking=no $EC2_HOST "
+                        docker pull hitesh1811/testrepo1:latest &&
+                        docker stop testrepo1 || true &&
+                        docker rm testrepo1 || true &&
+                        docker run -d --name testrepo1 -p 3000:3000 hitesh1811/testrepo1:latest
+                      "
+                    '''
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Pipeline executed successfully!"
+        }
+        failure {
+            echo "❌ Pipeline failed. Check logs for details."
         }
     }
 }
